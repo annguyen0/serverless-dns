@@ -39,7 +39,7 @@ jobs:
 
       - name: 🏷️ Metadata
         id: meta
-        uses: docker/metadata-action@906ecf0fc0a80f9110f79d9e6c04b1080f4a2621
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
@@ -85,7 +85,7 @@ jobs:
 
       - name: 🏷️ Metadata
         id: meta
-        uses: docker/metadata-action@906ecf0fc0a80f9110f79d9e6c04b1080f4a2621
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BUN }}
 
