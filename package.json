@@ -42,7 +42,7 @@
     "@fastly/js-compute": "^3.2.1"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.3",
     "buffer": "^6.0.3",
     "clinic": "^13.0.0",
     "eslint": "^9.2.0",
@@ -50,7 +50,7 @@
     "eslint-plugin-prettier": "^5.0.0",
     "husky": "^9.0.6",
     "lint-staged": "^16.1.2",
-    "prettier": "3.5.3",
+    "prettier": "3.6.2",
     "webpack": "^5.65.0",
     "webpack-cli": "^6.0.1",
     "wrangler": "^4.10.0"
