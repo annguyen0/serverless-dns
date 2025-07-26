@@ -6,10 +6,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import * as util from "./commons/util.js";
-import { handleRequest } from "./core/doh.js";
 import "./core/workers/config.js";
+import { handleRequest } from "./core/doh.js";
 import * as system from "./system.js";
+import * as util from "./commons/util.js";
 
 export default {
   // workers/runtime-apis/fetch-event#syntax-module-worker
@@ -34,7 +34,7 @@ function serveDoh(request, env, ctx) {
   return new Promise((accept) => {
     system
       .when("go")
-      .then((_v) => {
+      .then((v) => {
         return handleRequest(event);
       })
       .then((response) => {

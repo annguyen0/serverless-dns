@@ -5,16 +5,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-import * as bufutil from "../../commons/bufutil.js";
-import * as dnsutil from "../../commons/dnsutil.js";
-import * as envutil from "../../commons/envutil.js";
-import * as util from "../../commons/util.js";
-import * as system from "../../system.js";
-import * as cacheutil from "../cache-util.js";
+import { DnsBlocker } from "./blocker.js";
 import * as pres from "../plugin-response.js";
 import * as rdnsutil from "../rdns-util.js";
+import * as cacheutil from "../cache-util.js";
+import * as dnsutil from "../../commons/dnsutil.js";
+import * as bufutil from "../../commons/bufutil.js";
+import * as util from "../../commons/util.js";
+import * as envutil from "../../commons/envutil.js";
+import * as system from "../../system.js";
 import { BlocklistFilter } from "../rethinkdns/filter.js";
-import { DnsBlocker } from "./blocker.js";
 
 export default class DNSResolver {
   /**
@@ -164,17 +164,16 @@ export default class DNSResolver {
     let blf = this.bw.getBlocklistFilter();
     const isBlfDisabled = this.bw.disabled();
     let isBlfSetup = rdnsutil.isBlocklistFilterSetup(blf);
-    const ts = this.bw.timestamp(util.yyyymm());
 
     // if both blocklist-filter (blf) and stamps are not setup, question-block
     // is a no-op, while we expect answer-block to catch the block regardless.
-    const q = this.makeRdnsResponse(rxid, rawpacket, blf, stamps);
+    const q = await this.makeRdnsResponse(rxid, rawpacket, blf, stamps);
 
     this.blocker.blockQuestion(rxid, /* out*/ q, blInfo);
-    this.log.d(rxid, "q block?", q.isBlocked, "blf?", isBlfSetup, "ts?", ts);
+    this.log.d(rxid, "q block?", q.isBlocked, "blf?", isBlfSetup);
 
     if (q.isBlocked) {
-      this.primeCache(rxid, ts, q, dispatcher);
+      this.primeCache(rxid, q, dispatcher);
       return q;
     }
 
@@ -195,7 +194,6 @@ export default class DNSResolver {
         Promise.resolve(), // placeholder promise that never rejects
         this.resolveDnsUpstream(
           rxid,
-          ts,
           req,
           this.determineDohResolvers(alt, /* forceDoh */ true),
           rawpacket,
@@ -217,7 +215,6 @@ export default class DNSResolver {
         this.bw.init(rxid),
         this.resolveDnsUpstream(
           rxid,
-          ts,
           req,
           this.determineDohResolvers(userDns, forceUserDns),
           rawpacket,
@@ -265,18 +262,18 @@ export default class DNSResolver {
 
     const ans = await res.arrayBuffer();
 
-    const r = this.makeRdnsResponse(rxid, ans, blf, stamps);
+    const r = await this.makeRdnsResponse(rxid, ans, blf, stamps);
 
     // blockAnswer is a no-op if the ans is already quad0
     // check outgoing cached dns-packet against blocklists
     this.blocker.blockAnswer(rxid, /* out*/ r, blInfo);
     const fromCache = cacheutil.hasCacheHeader(res.headers);
-    this.log.d(rxid, "a block?", r.isBlocked, "c?", fromCache, "max?", fromMax);
+    this.log.d(rxid, "ansblock?", r.isBlocked, "fromcache?", fromCache);
 
     // if res was got from caches or if res was got from max doh (ie, blf
     // wasn't used to retrieve stamps), then skip hydrating the cache
     if (!fromCache && !fromMax) {
-      this.primeCache(rxid, ts, r, dispatcher);
+      this.primeCache(rxid, r, dispatcher);
     }
     return r;
   }
@@ -286,10 +283,9 @@ export default class DNSResolver {
    * @param {ArrayBuffer} raw
    * @param {BlocklistFilter} blf
    * @param {pres.BStamp?} stamps
-   * @returns {pres.RespData}
-   * @throws if raw is a malformed dns packet or not a dns packet.
+   * @returns
    */
-  makeRdnsResponse(rxid, raw, blf, stamps = null) {
+  async makeRdnsResponse(rxid, raw, blf, stamps = null) {
     if (!raw) throw new Error(rxid + " mk-res no upstream result");
 
     const dnsPacket = dnsutil.decode(raw);
@@ -306,21 +302,24 @@ export default class DNSResolver {
 
   /**
    * @param {string} rxid
-   * @param {string} ts
    * @param {pres.RespData} r
    * @param {function(function):void} dispatcher
    * @returns {Promise<void>}
    */
-  primeCache(rxid, ts, r, dispatcher) {
+  async primeCache(rxid, r, dispatcher) {
     const blocked = r.isBlocked;
-    const k = cacheutil.makeHttpCacheKey(r.dnsPacket, ts);
+
+    const k = cacheutil.makeHttpCacheKey(r.dnsPacket);
+
+    this.log.d(rxid, "primeCache: block?", blocked, "k", k.href);
+
     if (!k) {
       this.log.d(rxid, "primeCache: no key, url/query missing?", k, r.stamps);
       return;
     }
 
-    this.log.d(rxid, "primeCache: block?", blocked, "k", k.href);
     const v = cacheutil.cacheValueOf(r);
+
     this.cache.put(k, v, dispatcher);
   }
 
@@ -333,16 +332,14 @@ export default class DNSResolver {
 
 /**
  * @param {String} rxid
- * @param {String} ts
  * @param {Request} request
- * @param {String[]} resolverUrls
+ * @param {Array} resolverUrls
  * @param {ArrayBuffer} query
  * @param {any} packet
  * @returns {Promise<Response|Error>}
  */
 DNSResolver.prototype.resolveDnsUpstream = async function (
   rxid,
-  ts,
   request,
   resolverUrls,
   query,
@@ -418,12 +415,12 @@ DNSResolver.prototype.resolveDnsUpstream = async function (
   try {
     // upstream to cache
     this.log.d(rxid, "upstream cache");
-    promisedPromises.push(this.resolveDnsFromCache(rxid, ts, packet));
+    promisedPromises.push(this.resolveDnsFromCache(rxid, packet));
 
     // upstream to resolvers
     for (const rurl of resolverUrls) {
       if (util.emptyString(rurl)) {
-        this.log.w(rxid, "missing resolver url", rurl, "among", resolverUrls);
+        this.log.w(rxid, "missing resolver url", rurl);
         continue;
       }
 
@@ -467,19 +464,12 @@ DNSResolver.prototype.resolveDnsUpstream = async function (
   return Promise.any(promisedPromises);
 };
 
-/**
- * resolveDnsFromCache answers query requested by packet from local or remote cache.
- * @param {string} rxid
- * @param {string} ts
- * @param {any} packet
- * @returns {Promise<Response|Error>} with the answer as buffer of the dns packet or error
- */
-DNSResolver.prototype.resolveDnsFromCache = async function (rxid, ts, packet) {
-  const k = cacheutil.makeHttpCacheKey(packet, ts);
+DNSResolver.prototype.resolveDnsFromCache = async function (rxid, packet) {
+  const k = cacheutil.makeHttpCacheKey(packet);
   if (!k) throw new Error("resolver: no cache-key");
 
   const cr = await this.cache.get(k);
-  const isAns = cr != null && dnsutil.isAnswer(cr.dnsPacket);
+  const isAns = cr && dnsutil.isAnswer(cr.dnsPacket);
   const hasAns = isAns && dnsutil.hasAnswers(cr.dnsPacket);
   // if cr has answers, use probablistic expiry; otherwise prefer actual ttl
   const fresh = isAns && cacheutil.isAnswerFresh(cr.metadata, hasAns ? 0 : 6);
