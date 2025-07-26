@@ -51,10 +51,12 @@ jobs:
         run: |
           npm install
 
-      - name: 🎣 Fetch PR's head
+      - name: 🎣 Fetch PR's base and head
         run: |
+          git fetch origin ${{ env.BASE_REF }}
+          git fetch origin ${{ env.PR_HEAD_REF }}
+          git fetch origin ${{ env.BASE_SHA }}
           git fetch origin ${{ env.PR_HEAD_SHA }}
-
       # Abort if node modules are checked in
       - name: 🚨 Check for unsafe changes
         run: |
