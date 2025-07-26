@@ -80,6 +80,11 @@ jobs:
     name: 🚀 Deploy app
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
       - name: 🚚 Checkout
         uses: actions/checkout@v4
         with:
@@ -146,7 +151,7 @@ jobs:
 
       # experimental: github.com/superfly/flyctl-actions/pull/20
       - name: 🏗 Setup flyctl @ latest
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # master
         with:
           version: latest
 

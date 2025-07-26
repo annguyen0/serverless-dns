@@ -26,11 +26,21 @@ env:
   GH_REF: "${{ github.ref }}"
   GH_SHA: ${{ github.sha }}
 
+permissions:
+  contents: read
+
 jobs:
   lint-fmt:
+    permissions:
+      contents: write  # for Git to git push
     name: Lint & fmt
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
       - name: 🚚 Get latest code
         uses: actions/checkout@v4
         with:
@@ -41,10 +51,12 @@ jobs:
         run: |
           npm install
 
-      - name: 🎣 Fetch PR's head
+      - name: 🎣 Fetch PR's base and head
         run: |
+          git fetch origin ${{ env.BASE_REF }}
+          git fetch origin ${{ env.PR_HEAD_REF }}
+          git fetch origin ${{ env.BASE_SHA }}
           git fetch origin ${{ env.PR_HEAD_SHA }}
-
       # Abort if node modules are checked in
       - name: 🚨 Check for unsafe changes
         run: |
@@ -88,6 +100,8 @@ jobs:
 
       - name: 🚢 Push to origin?
         if: ${{ env.BASE_REPO == env.PR_HEAD_REPO }}
+        env:
+          PR_HEAD_REF: ${{ env.PR_HEAD_REF }}
         run: |
           git push origin HEAD:$PR_REF
         env:
@@ -100,6 +114,9 @@ jobs:
       # for pushing to forks.
       - name: 🚢 Push to fork?
         if: ${{ env.BASE_REPO != env.PR_HEAD_REPO }}
+        env:
+          PR_HEAD_REF: ${{ env.PR_HEAD_REF }}
+          PR_HEAD_REPO: ${{ env.PR_HEAD_REPO }}
         run: |
           git remote add fork $PR_REPO
           git push fork HEAD:$PR_REF

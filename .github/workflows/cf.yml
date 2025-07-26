@@ -108,15 +108,16 @@ jobs:
 
       - name: 📚 Wrangler publish
         # github.com/cloudflare/wrangler-action
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
           # input overrides env-defaults, regardless
           environment: ${{ env.WORKERS_ENV }}
           wranglerVersion: ${{ env.WRANGLER_VER }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
         env:
-          # setting CLOUDFLARE_ACCOUNT_ID no longer works
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.NEXTDNS_CONF }}
           GIT_COMMIT_ID: ${{ env.COMMIT_SHA }}
 
       - name: 🎤 Notice

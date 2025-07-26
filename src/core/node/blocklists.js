@@ -68,11 +68,9 @@ function save(bw) {
   return true;
 }
 
-/**
- * fmmap mmaps file at fp for random reads, returns a Buffer backed by the file.
- * @param {string} fp
- * @returns {Buffer?}
- */
+// fmmap mmaps file at fp for random reads, returns a Buffer backed by the file.
+
+
 async function fmmap(fp) {
   const dynimports = envutil.hasDynamicImports();
   const isNode = envutil.isNode();

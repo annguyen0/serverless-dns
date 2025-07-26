@@ -53,6 +53,9 @@ env:
   IN_FILE: 'src/server-deno.ts'
   OUT_FILE: 'rethinkdns.js'
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: 🌯 Deno Deploy
@@ -63,6 +66,11 @@ jobs:
       # needed to clone repo
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
       - name: 🚚 Fetch code
         uses: actions/checkout@v4
         with:
@@ -103,7 +111,7 @@ jobs:
       - name: 🤸🏼 Deploy to deno.com
         id: dd
         if: ${{ env.DEPLOY_MODE == 'action' }}
-        uses: denoland/deployctl@v1
+        uses: denoland/deployctl@1.13.1
         with:
           project: ${{ env.PROJECT_NAME }}
           # todo: if bundling, replace IN_FILE w/ OUT_FILE
