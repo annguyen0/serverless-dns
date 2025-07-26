@@ -6,22 +6,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import { FrozenTrie } from "@serverless-dns/trie/ftrie.js";
 import * as dnsutil from "../../commons/dnsutil.js";
 
 export class BlocklistFilter {
   constructor() {
     // see: src/helpers/node/blocklists.js:hasBlocklistFiles
-    /** @type {FrozenTrie} */
     this.ftrie = null;
-    /** @type {Object} */
     this.filetag = null;
   }
 
-  /**
-   * @param {FrozenTrie} frozentrie
-   * @param {Object} filetag
-   */
   load(frozentrie, filetag) {
     this.ftrie = frozentrie;
     this.filetag = filetag;
@@ -35,11 +28,6 @@ export class BlocklistFilter {
 
   lookup(n) {
     const t = this.ftrie;
-    if (t == null) {
-      log.w("blocklist filter not loaded");
-      return null;
-    }
-
     try {
       n = t.transform(n);
       return t.lookup(n);
@@ -67,9 +55,7 @@ export class BlocklistFilter {
 
   extract(ids) {
     const r = {};
-    if (this.filetag) {
-      for (const id of ids) r[id] = this.filetag[id];
-    }
+    for (const id of ids) r[id] = this.filetag[id];
     return r;
   }
 }

@@ -5,65 +5,63 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as bufutil from "../../commons/bufutil.js";
 import * as envutil from "../../commons/envutil.js";
 import * as cfg from "../../core/cfg.js";
-import { BlocklistWrapper } from "../../plugins/rethinkdns/main.js";
 // import mmap from "@riaskov/mmap-io";
 
 const blocklistsDir = "./blocklists__";
 const tdFile = "td.txt";
 const rdFile = "rd.txt";
-const bcFile = "basicconfig.json";
-const ftFile = "filetag.json";
 
-/**
- *
- * @param {BlocklistWrapper} bw
- * @returns
- */
 export async function setup(bw) {
   if (!bw || !envutil.hasDisk()) return false;
 
-  const ok = await setupLocally(bw);
+  const now = Date.now();
+  // timestamp is of form yyyy/epochMs
+  const timestamp = cfg.timestamp();
+  const url = envutil.blocklistUrl() + timestamp + "/";
+  const nodecount = cfg.tdNodeCount();
+  const tdparts = cfg.tdParts();
+  const tdcodec6 = cfg.tdCodec6();
+  const codec = tdcodec6 ? "u6" : "u8";
+  const useMmap = envutil.useMmap();
+
+  const ok = await setupLocally(bw, timestamp, codec, useMmap);
   if (ok) {
+    log.i("bl setup locally tstamp/nc", timestamp, nodecount);
     return true;
   }
 
-  log.i("dowloading blocklists");
-  await bw.init(/* rxid */ "bl-download", /* wait */ true);
+  log.i("dowloading bl u/u6?/nc/parts", url, tdcodec6, nodecount, tdparts);
+  await bw.initBlocklistConstruction(
+    /* rxid*/ "bl-download",
+    now,
+    url,
+    nodecount,
+    tdparts,
+    tdcodec6
+  );
 
-  return save(bw);
+  return save(bw, timestamp, codec);
 }
 
-/**
- * @param {BlocklistWrapper} bw
- * @returns {boolean}
- */
-function save(bw) {
+function save(bw, timestamp, codec) {
   if (!bw.isBlocklistFilterSetup()) return false;
 
-  const timestamp = bw.timestamp();
-  const codec = bw.codec();
   mkdirsIfNeeded(timestamp, codec);
 
-  const [tdfp, rdfp, bcfp, ftfp] = getFilePaths(timestamp, codec);
+  const [tdfp, rdfp] = getFilePaths(timestamp, codec);
 
   const td = bw.triedata();
   const rd = bw.rankdata();
-  const filetag = bw.filetag();
-  const basicconfig = bw.basicconfig();
   // write out array-buffers to disk
   fs.writeFileSync(tdfp, bufutil.bufferOf(td));
   fs.writeFileSync(rdfp, bufutil.bufferOf(rd));
-  // write out json objects to disk; may overwrite existing files
-  fs.writeFileSync(ftfp, JSON.stringify(filetag));
-  fs.writeFileSync(bcfp, JSON.stringify(basicconfig));
 
-  log.i("blocklist files written to disk", tdfp, rdfp, bcfp, ftfp);
+  log.i("blocklists written to disk");
 
   return true;
 }
@@ -101,25 +99,13 @@ async function fmmap(fp) {
   return null;
 }
 
-/**
- * setupLocally loads blocklist files and configurations from disk.
- * TODO: return false if blocklists age > AUTO_RENEW_BLOCKLISTS_OLDER_THAN
- * @param {BlocklistWrapper} bw
- * @returns
- */
-async function setupLocally(bw) {
-  // timestamp is of form yyyy/epochMs
-  const timestamp = cfg.timestamp();
-  const tdcodec6 = cfg.tdCodec6();
-  const codec = tdcodec6 ? "u6" : "u8";
-  const useMmap = envutil.useMmap();
-
+async function setupLocally(bw, timestamp, codec, useMmap) {
   const ok = hasBlocklistFiles(timestamp, codec);
   log.i(timestamp, codec, "has bl files?", ok);
   if (!ok) return false;
 
   const [td, rd] = getFilePaths(timestamp, codec);
-  log.i("on-disk ts/codec/td/rd", timestamp, codec, td, rd, "mmap?", useMmap);
+  log.i("on-disk codec/td/rd", codec, td, rd, "mmap?", useMmap);
 
   let tdbuf = useMmap ? await fmmap(td) : null;
   if (bufutil.emptyBuf(tdbuf)) {
@@ -150,24 +136,11 @@ function hasBlocklistFiles(timestamp, codec) {
   return fs.existsSync(td) && fs.existsSync(rd);
 }
 
-/**
- *
- * @param {string} t
- * @param {string} codec
- * @returns {string[]} array of file paths [td, rd, bc, ft]
- */
 function getFilePaths(t, codec) {
   const td = blocklistsDir + "/" + t + "/" + codec + "/" + tdFile;
   const rd = blocklistsDir + "/" + t + "/" + codec + "/" + rdFile;
-  const bc = codec + "-" + bcFile;
-  const ft = codec + "-" + ftFile;
 
-  return [
-    path.normalize(td),
-    path.normalize(rd),
-    path.normalize(bc),
-    path.normalize(ft),
-  ];
+  return [path.normalize(td), path.normalize(rd)];
 }
 
 function getDirPaths(t, codec) {

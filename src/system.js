@@ -29,7 +29,7 @@ const stickyEvents = new Set([
 const stickyParcels = new Map();
 
 const events = new Set([
-  // when process should cease
+  // when server should cease
   "stop",
 ]);
 
@@ -262,8 +262,8 @@ function safeBox(fns, arg) {
     }
     try {
       r.push(f(arg));
-    } catch (_) {
-      // log.e("sys: safeBox err", _);
+    } catch (ignore) {
+      // log.e("sys: safeBox err", ignore);
       r.push(null);
     }
   }
