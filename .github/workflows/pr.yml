@@ -103,7 +103,9 @@ jobs:
         env:
           PR_HEAD_REF: ${{ env.PR_HEAD_REF }}
         run: |
-          git push origin HEAD:"$PR_HEAD_REF"
+          git push origin HEAD:$PR_REF
+        env:
+          PR_REF: ${{ env.PR_HEAD_REF }}
 
       # `GITHUB_TOKEN` owned by `github-actions[bot]` has write access to
       # origin in this `PR-target` workflow but not the write access to fork
@@ -116,5 +118,9 @@ jobs:
           PR_HEAD_REF: ${{ env.PR_HEAD_REF }}
           PR_HEAD_REPO: ${{ env.PR_HEAD_REPO }}
         run: |
-          git remote add fork "$PR_HEAD_REPO"
-          git push fork HEAD:"$PR_HEAD_REF"
+          git remote add fork $PR_REPO
+          git push fork HEAD:$PR_REF
+        env:
+          # ref: docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+          PR_REF: ${{ env.PR_HEAD_REF }}
+          PR_REPO: ${{ env.PR_HEAD_REPO }}
