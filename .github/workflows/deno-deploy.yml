@@ -98,17 +98,13 @@ jobs:
           # todo: deno bundle ${IN_FILE} ${OUT_FILE}
         shell: bash
 
-      # github.com/denoland/deployctl/blob/febd898/action.yml
-      # step output: www.actionsbyexample.com/outputs.html
       - name: 🤸🏼 Deploy to deno.com
         id: dd
         if: ${{ env.DEPLOY_MODE == 'action' }}
-        uses: denoland/deployctl@v1
-        with:
-          project: ${{ env.PROJECT_NAME }}
-          # todo: if bundling, replace IN_FILE w/ OUT_FILE
-          entrypoint: ${{ env.IN_FILE }}
-
+        run: |
+          deno deploy --app ${{ env.PROJECT_NAME }} --entrypoint ${{ env.IN_FILE }}
+        env:
+          DENO_DEPLOY_TOKEN: ${{ secrets.DENO_DEPLOY_TOKEN }}
       - name: 🚢 Merge latest code into deploy-branch
         if: ${{ env.DEPLOY_MODE == 'auto' }}
         run: |
