@@ -25,13 +25,13 @@ jobs:
 
     steps:
       - name: 🚚 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
 
       - name: 🔐 Login
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -45,7 +45,7 @@ jobs:
 
       - name: 🛠 Build 
         id: push
-        uses: docker/build-push-action@v6.18.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: ./node.Dockerfile
@@ -54,7 +54,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: 📕 Attest
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -130,13 +130,13 @@ jobs:
 
     steps:
       - name: 🚚 Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.GIT_REF }}
           fetch-depth: 0
 
       - name: 🔐 Login
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -151,7 +151,7 @@ jobs:
       - name: 🛠 Build
         # imageid (string), digest (string), metadata (json)
         id: push
-        uses: docker/build-push-action@v6.18.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: ./bun.Dockerfile
@@ -160,7 +160,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: 📕 Attest
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BUN }}
           subject-digest: ${{ steps.push.outputs.digest }}
