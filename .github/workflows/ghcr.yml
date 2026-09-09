@@ -95,7 +95,7 @@ jobs:
           # severity-cutoff: critical
 
       - name: 📻 Grype SBOM to code-scanning
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.9
         with:
           # can also be a directory containing multiple sarif files
           sarif_file: "${{ github.workspace }}/sarifoutput/"
@@ -202,7 +202,7 @@ jobs:
           # severity-cutoff: critical
 
       - name: 📻 Grype SBOM to code-scanning
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.9
         with:
           # can also be a directory containing multiple sarif files
           sarif_file: "${{ github.workspace }}/sarifoutput/"
