@@ -32,6 +32,12 @@ let wk = Math.ceil(day / 7);
 const mmStr = mm.toString();
 const wkStr = wk.toString();
 
+/**
+ * Downloads a text resource to `dest`.
+ *
+ * @returns `true` after the response is written, or `false` if the request,
+ * response, or file write fails.
+ */
 async function downloadFile(url: string, dest: string): Promise<boolean> {
   try {
     const response = await fetch(url, { method: "GET" });
@@ -53,6 +59,15 @@ function hasForwardSlash(s: string): boolean {
   return s.includes("/");
 }
 
+/**
+ * Extracts the file-tag timestamp from a comma-delimited basic configuration.
+ *
+ * The ninth field is preferred; the eighth is used when the filtered ninth
+ * field contains no forward slash.
+ *
+ * @returns The selected field stripped to digits and forward slashes, or
+ * `null` when a required field or colon delimiter is absent.
+ */
 function extractTimestamp(content: string): string | null {
   // Mimic the shell script logic:
   // fulltimestamp=$(cut -d"," -f9 "$out" | cut -d":" -f2 | tr -dc '0-9/')
@@ -94,6 +109,13 @@ function extractTimestamp(content: string): string | null {
   return timestamp;
 }
 
+/**
+ * Downloads a week bucket's basic configuration and its referenced file tag.
+ *
+ * @returns `true` only after both output files are written. A failed file-tag
+ * download triggers best-effort removal of both files; other failures may
+ * leave the basic configuration in place.
+ */
 async function tryDownload(yyyy: number, mm: number, wk: number): Promise<boolean> {
   const url = `${burl}/${yyyy}/${dir}/${mm}-${wk}/${codec}/${f}`;
   console.log(`x=== pre.ts: try ${yyyy}/${mm}-${wk}`);
@@ -136,6 +158,13 @@ async function tryDownload(yyyy: number, mm: number, wk: number): Promise<boolea
   return false;
 }
 
+/**
+ * Prepares blocklist configuration files unless the basic configuration path
+ * already exists.
+ *
+ * Tries at most five descending week buckets and exits with status 1 if none
+ * succeeds.
+ */
 async function main() {
   // Check if files already exist
   try {
