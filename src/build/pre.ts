@@ -32,6 +32,15 @@ let wk = Math.ceil(day / 7);
 const mmStr = mm.toString();
 const wkStr = wk.toString();
 
+/**
+ * Downloads a text resource to a local file.
+ *
+ * Non-success HTTP responses and handled fetch or write errors return `false`.
+ *
+ * @param url - Resource URL to fetch.
+ * @param dest - File path to overwrite with the response body.
+ * @returns Whether a successful response was written to `dest`.
+ */
 async function downloadFile(url: string, dest: string): Promise<boolean> {
   try {
     const response = await fetch(url, { method: "GET" });
@@ -53,6 +62,17 @@ function hasForwardSlash(s: string): boolean {
   return s.includes("/");
 }
 
+/**
+ * Extracts the blocklist timestamp from its comma-delimited configuration.
+ *
+ * The ninth field is preferred when it contains a slash; otherwise, the
+ * eighth field is used.
+ *
+ * @param content - Contents of a basic configuration file.
+ * @returns The timestamp stripped to digits and slashes, or `null` when the
+ * expected field structure is absent. The fallback field may yield an empty
+ * string.
+ */
 function extractTimestamp(content: string): string | null {
   // Mimic the shell script logic:
   // fulltimestamp=$(cut -d"," -f9 "$out" | cut -d":" -f2 | tr -dc '0-9/')
@@ -94,6 +114,16 @@ function extractTimestamp(content: string): string | null {
   return timestamp;
 }
 
+/**
+ * Downloads the basic configuration for a calendar bucket and its referenced
+ * file-tag configuration.
+ * A failed file-tag download triggers best-effort removal of both outputs.
+ *
+ * @param yyyy - UTC year in the blocklist storage path.
+ * @param mm - UTC month in the blocklist storage path.
+ * @param wk - Week-of-month value in the blocklist storage path.
+ * @returns Whether both configuration files were downloaded successfully.
+ */
 async function tryDownload(yyyy: number, mm: number, wk: number): Promise<boolean> {
   const url = `${burl}/${yyyy}/${dir}/${mm}-${wk}/${codec}/${f}`;
   console.log(`x=== pre.ts: try ${yyyy}/${mm}-${wk}`);
@@ -136,6 +166,13 @@ async function tryDownload(yyyy: number, mm: number, wk: number): Promise<boolea
   return false;
 }
 
+/**
+ * Prepares the local blocklist configuration files for a Deno build.
+ *
+ * If the configured basic-configuration output path already exists, no
+ * downloads are attempted. Otherwise, up to five weekly candidates are tried,
+ * and the process exits with status 1 if none produces both required files.
+ */
 async function main() {
   // Check if files already exist
   try {
