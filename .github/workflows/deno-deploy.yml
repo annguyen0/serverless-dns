@@ -1,4 +1,4 @@
-name: 🦕 Deno
+name: 🦕 Deno Deploy
 
 on:
   push:
@@ -22,101 +22,66 @@ on:
       - "run"
   workflow_dispatch:
     inputs:
-      deploy-mode:
-        description: 'Deploy via action or auto'
-        required: false
-        default: 'action'
-        type: choice
-        options:
-        - action
-        - auto
       git-ref:
-        description: 'Git branch / tag / commit (used for auto deploy-mode)'
+        description: 'Git branch / tag / commit to deploy'
         required: false
         default: 'main'
-      deployment-type:
-        description: 'Deploy branch (used for auto deploy-mode)'
-        required: false
-        default: 'dev'
-        type: choice
-        options:
-        - dev
-        - live
-
-env:
-  DEPLOY_MODE: 'action'
-  PROJECT_NAME: ${{ secrets.DENO_PROJECT_NAME || 'rdns' }}
-  BUILD_BRANCH: >
-    ${{ github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.deployment-type == 'live' &&
-      'build/deno-deploy/live' || 'build/deno-deploy/dev' }}
-  IN_FILE: 'src/server-deno.ts'
-  OUT_FILE: 'rethinkdns.js'
 
 jobs:
   deploy:
-    name: 🌯 Deno Deploy
+    name: 🦕 Deno Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
-      # needed for auth with deno.com
+      # needed to authenticate with deno.com via OIDC (id-token); fall back to
+      # the DENO_DEPLOY_TOKEN secret if OIDC is not enabled.
       id-token: write
       # needed to clone repo
       contents: read
     steps:
       - name: 🚚 Fetch code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.git-ref || github.ref }}
           fetch-depth: 0
 
-      - name: 🏝 Setup env
-        shell: bash
-        run: |
-          echo "DEPLOY_MODE=${DM}" >> $GITHUB_ENV
-          echo "::notice::deploy mode: $DM, project: $PROJECT_NAME"
-        env:
-          DM: ${{ github.event.inputs.deploy-mode || env.DEPLOY_MODE }}
-
-      - name: 🧰 Checkout deploy-branch
-        if: ${{ env.DEPLOY_MODE == 'auto' }}
-        run: |
-          git fetch --all
-          git checkout --orphan ${BUILD_BRANCH} || git checkout ${BUILD_BRANCH}
-          git reset
-          git merge origin/${BUILD_BRANCH} || :
-
       - name: 🦕 Install Deno@2.x
-        uses: denoland/setup-deno@main
+        uses: denoland/setup-deno@v2
         with:
           deno-version: 2.x
 
-      - name: 📦 Bundle up
-        if: ${{ env.DEPLOY_MODE == 'action' }}
+      # Fetch the latest blocklist basicconfig/filetag into src/ (cfg.js
+      # imports them at module-load). These files are gitignored, so they are
+      # generated on-demand during CI, and again by the `deploy.build` step in
+      # deno.json on the Deno Deploy build machines (which lack `wget`).
+      - name: 📦 Fetch blocklist config
         run: |
-          echo "::notice::do not forget to set DENO_PROJECT_NAME via github secrets!"
-          deno task prepare
-          # todo: deno bundle ${IN_FILE} ${OUT_FILE}
-        shell: bash
+          echo "::notice::generating src/u6-basicconfig.json & src/u6-filetag.json"
+          deno task prepare-deno
 
-      # github.com/denoland/deployctl/blob/febd898/action.yml
-      # step output: www.actionsbyexample.com/outputs.html
-      - name: 🤸🏼 Deploy to deno.com
-        id: dd
-        if: ${{ env.DEPLOY_MODE == 'action' }}
-        uses: denoland/deployctl@v1
-        with:
-          project: ${{ env.PROJECT_NAME }}
-          # todo: if bundling, replace IN_FILE w/ OUT_FILE
-          entrypoint: ${{ env.IN_FILE }}
+      - name: 🩺 Type-check
+        run: deno check --allow-import --import-map import_map.json src/server-deno.ts
 
-      - name: 🚢 Merge latest code into deploy-branch
-        if: ${{ env.DEPLOY_MODE == 'auto' }}
+      - name: 🤸 Deploy to Deno Deploy
+        # `deno deploy` (no subcommand) uploads the current directory and
+        # builds + routes it according to the `deploy` block in deno.json.
+        # org/app/token are read from DENO_DEPLOY_* env vars, which avoids the
+        # `--org`/`--app`/`--prod` flags (these currently trip an upstream
+        # duplicate-option bug in the bundled @deno/deploy CLI).
+        #
+        # Production routing: rather than relying on `--prod` (blocked by the
+        # same upstream bug), link this repository in the Deno Deploy dashboard
+        # (console.deno.com) so the default-branch build is routed to the app's
+        # Production timeline automatically. `--prod` can be added back here
+        # once denoland/deploy resolves the duplicate-option issue.
         run: |
-          git config --local user.name 'github-actions[bot]'
-          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
-          # todo: deno bundle has been deprecated
-          git add ${OUT_FILE}
-          git commit -m "Update bundle for ${GITHUB_SHA}" && \
-            echo "::notice::Pushing to ${BUILD_BRANCH}" || \
-            echo "::notice::No changes to commit"
-          git push origin ${BUILD_BRANCH}
+          deno deploy
+        env:
+          # Either set a fine-grained DENO_DEPLOY_TOKEN secret, or enable OIDC
+          # on the Deno Deploy / GitHub integration (permissions.id-token above).
+          DENO_DEPLOY_TOKEN: ${{ secrets.DENO_DEPLOY_TOKEN }}
+          # Org/app may also be persisted in the dashboard's app config. When
+          # unset here, the CLI falls back to interactive selection (not
+          # possible in CI), so set DENO_DEPLOY_ORG / DENO_DEPLOY_APP secrets.
+          DENO_DEPLOY_ORG: ${{ secrets.DENO_ORG }}
+          DENO_DEPLOY_APP: ${{ secrets.DENO_DEPLOY_APP || secrets.DENO_PROJECT_NAME || 'rdns' }}

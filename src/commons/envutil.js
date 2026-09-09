@@ -23,7 +23,15 @@ export function onFly() {
 export function onDenoDeploy() {
   if (!envManager) return false;
 
-  return envManager.get("CLOUD_PLATFORM") === "deno-deploy";
+  // Detect Deno Deploy robustly. Deno Deploy (new and Classic) does not set
+  // `CLOUD_PLATFORM`, but it does set `DENO_DEPLOYMENT_ID` (and `DENO_REGION`)
+  // at runtime, and `DENO_DEPLOY=true` during builds / in the runtime.
+  return (
+    envManager.get("CLOUD_PLATFORM") === "deno-deploy" ||
+    envManager.get("DENO_DEPLOY") === "true" ||
+    envManager.get("DENO_DEPLOYMENT_ID") != null ||
+    envManager.get("DENO_REGION") != null
+  );
 }
 
 export function onFastly() {
