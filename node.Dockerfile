@@ -1,4 +1,4 @@
-FROM node:25 as setup
+FROM node:26 as setup
 # git is required if any of the npm packages are git[hub] packages
 RUN apt-get update && apt-get install git -yq --no-install-suggests --no-install-recommends
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN export BLOCKLIST_DOWNLOAD_ONLY=true && node ./dist/fly.mjs
 
 # stage 2
 # pin to node25 for native deps (@riaskov/mmap-io via ignoramous fork)
-FROM node:25-alpine AS runner
+FROM node:26-alpine AS runner
 
 # env vals persist even at run-time: archive.is/QpXp2
 # and overrides fly.toml env values
