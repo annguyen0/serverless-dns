@@ -45,7 +45,7 @@ jobs:
 
       - name: 🛠 Build 
         id: push
-        uses: docker/build-push-action@v6.18.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: ./node.Dockerfile
@@ -151,7 +151,7 @@ jobs:
       - name: 🛠 Build
         # imageid (string), digest (string), metadata (json)
         id: push
-        uses: docker/build-push-action@v6.18.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: ./bun.Dockerfile
