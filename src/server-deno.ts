@@ -81,13 +81,25 @@ function systemUp() {
   const crtpath = envutil.tlsCrtPath() as string;
   const keypath = envutil.tlsKeyPath() as string;
   const dotls = !onDenoDeploy && !isCleartext;
+  // Only attempt to read TLS material when both paths are provided and we are
+  // not on Deno Deploy. On Deno Deploy `crtpath`/`keypath` are unset, so
+  // `Deno.readTextFileSync("")` would throw and crash the isolate at bring-up.
+  const hasCreds = !util.emptyString(crtpath) && !util.emptyString(keypath);
 
-  const tlsOpts = dotls
-    ? {
-        // docs.deno.com/runtime/reference/migration_guide/
-        cert: Deno.readTextFileSync(crtpath),
-        key: Deno.readTextFileSync(keypath),
-      }
+  const tlsOpts = dotls && hasCreds
+    ? (() => {
+        try {
+          // docs.deno.com/runtime/reference/migration_guide/
+          return {
+            cert: Deno.readTextFileSync(crtpath),
+            key: Deno.readTextFileSync(keypath),
+          };
+        } catch (ex) {
+          // Degrade gracefully to a cleartext DoH listener instead of crashing.
+          log.w("tls cert/key unreadable; falling back to cleartext", ex);
+          return { cert: "", key: "" };
+        }
+      })()
     : { cert: "", key: "" };
   // deno.land/manual@v1.18.0/runtime/http_server_apis_low_level
   const httpOpts = {
@@ -229,7 +241,7 @@ async function resolveQuery(q: Uint8Array) {
   const freq: Request = new Request("https://ignored.example.com", {
     method: "POST",
     headers: util.concatHeaders(util.dnsHeaders(), util.contentLengthHeader(q)),
-    body: q,
+    body: q as BodyInit,
   });
 
   const r = await handleRequest(util.mkFetchEvent(freq));

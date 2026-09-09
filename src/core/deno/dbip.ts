@@ -22,7 +22,7 @@ export async function setup(lp: LogPusher) {
     return false;
   }
 
-  const url: string = envutil.geoipUrl();
+  const url: string = (envutil.geoipUrl() as string) || "";
   const timestamp: string = timestampFromUrl(url);
 
   const ok = setupLocally(lp, timestamp);
@@ -97,7 +97,9 @@ function hasDbipFiles(timestamp: string) {
     const g6ent = Deno.statSync(g6fp);
 
     return g4ent.isFile && g6ent.isFile;
-  } catch (ignored) {}
+  } catch (ignored) {
+    // empty
+  }
 
   return false;
 }
@@ -127,7 +129,9 @@ function mkdirsIfNeeded(timestamp: string) {
   try {
     dinfo1 = Deno.statSync(dir1);
     dinfo2 = Deno.statSync(dir2);
-  } catch (ignored) {}
+  } catch (ignored) {
+    // empty
+  }
 
   if (!dinfo1 || !dinfo1.isDirectory) {
     console.info("creating dbip dir", dir1);

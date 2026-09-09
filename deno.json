@@ -16,6 +16,14 @@
     }
   },
   "tasks": {
-    "prepare": "deno run --allow-net --allow-read --allow-write ./src/build/pre.ts"
+    "prepare": "./src/build/pre.sh",
+    "prepare-deno": "deno run --allow-net --allow-write src/build/pre-deno.ts"
+  },
+  "deploy": {
+    "build": "deno run --allow-net --allow-write src/build/pre-deno.ts",
+    "runtime": {
+      "type": "dynamic",
+      "entrypoint": "src/server-deno.ts"
+    }
   }
 }
