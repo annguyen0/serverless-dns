@@ -157,11 +157,7 @@ function systemUp() {
   }
 
   function terminateTls() {
-    if (onDenoDeploy) return false;
-    if (envutil.isCleartext() as boolean) return false;
-    if (util.emptyString(tlsOpts.key)) return false;
-    if (util.emptyString(tlsOpts.cert)) return false;
-    return true;
+    return !(onDenoDeploy || Boolean(envutil.isCleartext()) || util.emptyString(tlsOpts.key) || util.emptyString(tlsOpts.cert));
   }
 }
 
