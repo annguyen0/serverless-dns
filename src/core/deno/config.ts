@@ -26,9 +26,15 @@ function prep() {
   // if this file execs... assume we're on deno.
   if (!Deno) throw new Error("failed loading deno-specific config");
 
-  const isProd = Deno.env.get("DENO_ENV_DOMAIN") === "production";
-  const onDenoDeploy = Deno.env.get("CLOUD_PLATFORM") === "deno-deploy";
-  const profiling = Deno.env.get("PROFILE_DNS_RESOLVES") === "true";
+  const envFor = (k: string): string | undefined => Deno.env.get(k) ?? undefined;
+  const isProd = envFor("DENO_ENV_DOMAIN") === "production";
+  // Detect Deno Deploy robustly: Deploy does not set `CLOUD_PLATFORM`, but
+  // sets `DENO_DEPLOY=true` during builds and `DENO_DEPLOYMENT_ID` at runtime.
+  const onDenoDeploy =
+    envFor("CLOUD_PLATFORM") === "deno-deploy" ||
+    envFor("DENO_DEPLOY") === "true" ||
+    envFor("DENO_DEPLOYMENT_ID") != null;
+  const profiling = envFor("PROFILE_DNS_RESOLVES") === "true";
 
   globalThis.envManager = new EnvManager();
 
