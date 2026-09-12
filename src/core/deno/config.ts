@@ -50,33 +50,50 @@ function prep() {
 }
 
 async function up() {
-  if (!services.ready) {
-    console.error("services not yet ready and there is a sig-up!?");
-    return;
-  }
-
-  const bw = services.blocklistWrapper;
-  if (bw != null && !bw.disabled()) {
-    await blocklists.setup(bw);
-  } else {
-    console.warn("Config", "blocklists unavailable / disabled");
-  }
-  const lp = services.logPusher;
-  if (lp != null) {
-    try {
-      await dbip.setup(lp);
-    } catch (ex) {
-      console.error("Config", "dbip setup failed", ex);
+  try {
+    if (!services.ready) {
+      console.error("services not yet ready and there is a sig-up!?");
+      return;
     }
-  } else {
-    console.warn("Config", "logpusher unavailable");
+
+    const bw = services.blocklistWrapper;
+    if (bw != null && !bw.disabled()) {
+      try {
+        await blocklists.setup(bw);
+      } catch (ex) {
+        console.error("Config", "blocklists setup failed", ex);
+      }
+    } else {
+      console.warn("Config", "blocklists unavailable / disabled");
+    }
+    const lp = services.logPusher;
+    if (lp != null) {
+      try {
+        await dbip.setup(lp);
+      } catch (ex) {
+        console.error("Config", "dbip setup failed", ex);
+      }
+    } else {
+      console.warn("Config", "logpusher unavailable");
+    }
+  } catch (ex) {
+    console.error("Config", "deno up failed", ex);
+  } finally {
+    // docs.deno.com/runtime/tutorials/os_signals
+    // NB: signal registration must never block the "go" event (Deno Deploy
+    // would otherwise never reach Deno.serve() and reply 500 to every request).
+    try {
+      Deno.addSignalListener("SIGINT", () => {
+        stopAfter();
+      });
+    } catch (ex) {
+      console.error("Config", "signal listener unavailable", ex);
+    }
+
+    // NB: emit "go" only after the current macrotask drains so every "go"
+    // subscriber (notably the server entrypoint) is registered before
+    // Deno.serve() must start. util.timeout() unrefs its timer, which would
+    // let this Deno process exit before serving; use a ref’d setTimeout.
+    setTimeout(() => system.pub("go"), 50);
   }
-
-  // docs.deno.com/runtime/tutorials/os_signals
-  Deno.addSignalListener("SIGINT", () => {
-    stopAfter();
-  });
-
-  // signal all system are-a go
-  system.pub("go");
 }

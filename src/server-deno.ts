@@ -55,6 +55,7 @@ function systemDown() {
 function systemUp() {
   log = loggerWithTags("Deno");
   if (!log) throw new Error("logger unavailable on system up");
+  log.i("deno systemUp: reaching serve stage");
 
   const downloadmode = envutil.blocklistDownloadOnly() as boolean;
   const profilermode = envutil.profileDnsResolves() as boolean;
@@ -70,7 +71,20 @@ function systemUp() {
   const abortctl = new AbortController();
   const onDenoDeploy = envutil.onDenoDeploy() as boolean;
   const isCleartext = envutil.isCleartext() as boolean;
-  const dohConnOpts = { port: envutil.dohBackendPort() };
+  // NB: on Deno Deploy, `Deno.serve()` is intercepted by the platform, but an
+  // invalid/custom port or abort-signal failure can still prevent the listener
+  // from starting. Honor PORT when the platform assigns one; bind 0.0.0.0.
+  const deployPort = (() => {
+    try {
+      const p = parseInt(Deno.env.get("PORT") || "", 10);
+      return !isNaN(p) && p > 0 ? p : envutil.dohBackendPort();
+    } catch (_) {
+      return envutil.dohBackendPort();
+    }
+  })();
+  const dohConnOpts = onDenoDeploy
+    ? { port: deployPort, hostname: "0.0.0.0" }
+    : { port: envutil.dohBackendPort() };
   const dotConnOpts = { port: envutil.dotBackendPort() };
   const sigOpts = {
     signal: abortctl.signal,
@@ -101,12 +115,17 @@ function systemUp() {
         }
       })()
     : { cert: "", key: "" };
-  // deno.land/manual@v1.18.0/runtime/http_server_apis_low_level
-  const httpOpts = {
-    alpnProtocols: ["h2", "http/1.1"],
-  };
+  // NB: modern Deno auto-supports h2/http1.1; passing alpnProtocols throws
+  // ("Unsupported 'alpnProtocols' option") and prevents Deno.serve() startup.
+  // That stuck boot is exactly the Deno Deploy 500 seen in production.
+  const httpOpts = onDenoDeploy ? {} : { alpnProtocols: ["h2", "http/1.1"] };
 
-  startDoh();
+  try {
+    startDoh();
+  } catch (ex) {
+    log.e("deno serve start failed", ex);
+    throw ex;
+  }
   startDotIfPossible();
 
   // docs.deno.com/runtime/fundamentals/http_server
