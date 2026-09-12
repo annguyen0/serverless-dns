@@ -28,8 +28,16 @@ const outFiletag = `${srcDir}/${codec}-${fileTagName}`;
 // Full snapshots are committed to the repo (see .gitignore) so that
 // `src/core/cfg.js` can never fail to import them at module-load on any
 // runtime. On Deno Deploy builds we *always* re-fetch, so the committed
-// snapshots don't go stale every time the app is redeployed.
-const forceRefresh = Deno.env.get("DENO_DEPLOY") === "true";
+// snapshots don't go stale every time the app is redeployed. The env read is
+// guarded because callers may not grant env permission (e.g. the Deno Deploy
+// build command only passes --allow-net/--allow-write/--allow-env); if it is
+// unavailable we simply fall back to the committed snapshots.
+let forceRefresh = false;
+try {
+  forceRefresh = Deno.env.get("DENO_DEPLOY") === "true";
+} catch {
+  /* env access unavailable; keep committed snapshots */
+}
 
 async function exists(p: string): Promise<boolean> {
   try {

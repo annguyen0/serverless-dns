@@ -17,10 +17,10 @@
   },
   "tasks": {
     "prepare": "./src/build/pre.sh",
-    "prepare-deno": "deno run --allow-net --allow-write src/build/pre-deno.ts"
+    "prepare-deno": "deno run --allow-net --allow-write --allow-read --allow-env=DENO_DEPLOY src/build/pre-deno.ts"
   },
   "deploy": {
-    "build": "deno run --allow-net --allow-write src/build/pre-deno.ts",
+    "build": "deno run --allow-net --allow-write --allow-read --allow-env=DENO_DEPLOY src/build/pre-deno.ts",
     "runtime": {
       "type": "dynamic",
       "entrypoint": "src/server-deno.ts"
