@@ -25,6 +25,12 @@ const srcDir = `${Deno.cwd()}/src`;
 const outBasic = `${srcDir}/${codec}-${basicConfigName}`;
 const outFiletag = `${srcDir}/${codec}-${fileTagName}`;
 
+// Full snapshots are committed to the repo (see .gitignore) so that
+// `src/core/cfg.js` can never fail to import them at module-load on any
+// runtime. On Deno Deploy builds we *always* re-fetch, so the committed
+// snapshots don't go stale every time the app is redeployed.
+const forceRefresh = Deno.env.get("DENO_DEPLOY") === "true";
+
 async function exists(p: string): Promise<boolean> {
   try {
     const st = await Deno.stat(p);
@@ -62,7 +68,8 @@ async function writeIfOk(url: string, path: string): Promise<boolean> {
 }
 
 // if both files already exist, nothing to do (as with pre.sh)
-if ((await exists(outBasic)) && (await exists(outFiletag))) {
+// (unless we're on a Deno Deploy build, where we always refresh)
+if (!forceRefresh && (await exists(outBasic)) && (await exists(outFiletag))) {
   console.log("pre-deno: no-op, both files present", outBasic, outFiletag);
   Deno.exit(0);
 }
@@ -74,7 +81,8 @@ let wk = w0;
 
 // 0..4 (5 tries), stepping back one week at a time like pre.sh
 for (let i = 0; i <= 4; i++) {
-  if (await exists(outBasic)) {
+  // on Deno Deploy, overwrite the committed snapshot with the latest config
+  if (!forceRefresh && (await exists(outBasic))) {
     console.log("pre-deno: no-op, basicconfig present", outBasic);
     Deno.exit(0);
   }
