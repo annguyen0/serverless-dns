@@ -65,23 +65,46 @@ jobs:
       - name: 🤸 Deploy to Deno Deploy
         # `deno deploy` (no subcommand) uploads the current directory and
         # builds + routes it according to the `deploy` block in deno.json.
-        # org/app/token are read from DENO_DEPLOY_* env vars, which avoids the
-        # `--org`/`--app`/`--prod` flags (these currently trip an upstream
-        # duplicate-option bug in the bundled @deno/deploy CLI).
         #
-        # Production routing: rather than relying on `--prod` (blocked by the
-        # same upstream bug), link this repository in the Deno Deploy dashboard
+        # deno.json's `deploy` object is validated against a strict schema in
+        # which `org` is REQUIRED. The DENO_DEPLOY_ORG / DENO_DEPLOY_APP env
+        # vars only feed the CLI's org/app *resolution*; on their own they do
+        # NOT satisfy this schema parse, which otherwise fails with:
+        #   Failed to parse "deploy" configuration: missing field `org`
+        # (Passing --org/--app has the same problem.) So inject `org` (and the
+        # optional `app`) into the config from the environment, keeping them
+        # out of the committed repo. The existing `build`/`runtime` keys are
+        # valid and are preserved; they configure the Deno Deploy build machine.
+        #
+        # Production routing: rather than relying on `--prod` (currently
+        # tripped by an upstream duplicate-option bug in the bundled
+        # @deno/deploy CLI), link this repository in the Deno Deploy dashboard
         # (console.deno.com) so the default-branch build is routed to the app's
-        # Production timeline automatically. `--prod` can be added back here
-        # once denoland/deploy resolves the duplicate-option issue.
+        # Production timeline automatically. `--prod` can be added back once
+        # denoland/deploy resolves the duplicate-option issue.
         run: |
+          deno eval --no-config '
+          const path = "deno.json";
+          const cfg = JSON.parse(Deno.readTextFileSync(path));
+          const org = Deno.env.get("DENO_DEPLOY_ORG");
+          const app = Deno.env.get("DENO_DEPLOY_APP");
+          if (!org) {
+            console.error("DENO_DEPLOY_ORG is empty; set the DENO_ORG repository secret.");
+            Deno.exit(1);
+          }
+          cfg.deploy = { ...(cfg.deploy ?? {}), org };
+          if (app) cfg.deploy.app = app;
+          Deno.writeTextFileSync(path, JSON.stringify(cfg, null, 2) + "\n");
+          '
           deno deploy
         env:
           # Either set a fine-grained DENO_DEPLOY_TOKEN secret, or enable OIDC
           # on the Deno Deploy / GitHub integration (permissions.id-token above).
           DENO_DEPLOY_TOKEN: ${{ secrets.DENO_DEPLOY_TOKEN }}
-          # Org/app may also be persisted in the dashboard's app config. When
-          # unset here, the CLI falls back to interactive selection (not
-          # possible in CI), so set DENO_DEPLOY_ORG / DENO_DEPLOY_APP secrets.
+          # DENO_DEPLOY_ORG is required: it is written into deno.json's `deploy`
+          # block above, because the schema rejects a missing `org`.
+          # DENO_DEPLOY_APP is optional (it defaults to the app named in the
+          # dashboard). Both are also read back by the CLI for org/app
+          # resolution, so they must be set (the CLI cannot prompt in CI).
           DENO_DEPLOY_ORG: ${{ secrets.DENO_ORG }}
           DENO_DEPLOY_APP: ${{ secrets.DENO_DEPLOY_APP || secrets.DENO_PROJECT_NAME || 'rdns' }}
